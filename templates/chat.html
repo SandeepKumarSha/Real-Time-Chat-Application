@@ -1,41 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Real-Time Chat</title>
 
-<title>Real Time Chat</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 
 <body>
 
-<h2>Welcome {{ username }}</h2>
+<div class="chat-container">
 
-<a href="/logout">Logout</a>
+    <div class="header">
+        <h2>💬 Real-Time Chat</h2>
 
-<hr>
+        <div>
+            Welcome <b>{{ username }}</b>
+            |
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
 
-<div id="chat-box">
+    <div id="chat-box" class="chat-box">
 
-{% for msg in messages %}
-<p>
-<b>{{ msg.username }}</b> :
-{{ msg.content }}
-</p>
-{% endfor %}
+        {% for msg in messages %}
+            <div class="message">
+                <b>{{ msg.username }}</b>
+                <p>{{ msg.content }}</p>
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <div class="input-area">
+
+        <input
+            type="text"
+            id="message"
+            placeholder="Type a message...">
+
+        <button onclick="sendMessage()">
+            Send
+        </button>
+
+    </div>
 
 </div>
-
-<hr>
-
-<input
-type="text"
-id="message">
-
-<button onclick="sendMessage()">
-Send
-</button>
 
 <script>
 
@@ -43,27 +55,28 @@ const socket = io();
 
 const username = "{{ username }}";
 
-socket.on(
-    'receive_message',
-    function(data){
+socket.on('receive_message', function(data){
 
-        let box =
-        document.getElementById(
-            'chat-box'
-        );
+    let box = document.getElementById('chat-box');
 
-        box.innerHTML +=
-        `<p><b>${data.username}</b> :
-        ${data.message}</p>`;
-    }
-);
+    box.innerHTML += `
+        <div class="message">
+            <b>${data.username}</b>
+            <p>${data.message}</p>
+        </div>
+    `;
+
+    box.scrollTop = box.scrollHeight;
+});
 
 function sendMessage(){
 
     let message =
-    document.getElementById(
-        'message'
-    ).value;
+        document.getElementById('message').value;
+
+    if(message.trim() === ''){
+        return;
+    }
 
     socket.emit(
         'send_message',
@@ -73,9 +86,7 @@ function sendMessage(){
         }
     );
 
-    document.getElementById(
-        'message'
-    ).value = '';
+    document.getElementById('message').value = '';
 }
 
 </script>
