@@ -1,15 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat</title>
+
+<title>Real Time Chat</title>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
 </head>
+
 <body>
 
-<h1>Welcome {{ username }}</h1>
-
-<p>You are logged in successfully.</p>
+<h2>Welcome {{ username }}</h2>
 
 <a href="/logout">Logout</a>
+
+<hr>
+
+<div id="chat-box">
+
+{% for msg in messages %}
+<p>
+<b>{{ msg.username }}</b> :
+{{ msg.content }}
+</p>
+{% endfor %}
+
+</div>
+
+<hr>
+
+<input
+type="text"
+id="message">
+
+<button onclick="sendMessage()">
+Send
+</button>
+
+<script>
+
+const socket = io();
+
+const username = "{{ username }}";
+
+socket.on(
+    'receive_message',
+    function(data){
+
+        let box =
+        document.getElementById(
+            'chat-box'
+        );
+
+        box.innerHTML +=
+        `<p><b>${data.username}</b> :
+        ${data.message}</p>`;
+    }
+);
+
+function sendMessage(){
+
+    let message =
+    document.getElementById(
+        'message'
+    ).value;
+
+    socket.emit(
+        'send_message',
+        {
+            username: username,
+            message: message
+        }
+    );
+
+    document.getElementById(
+        'message'
+    ).value = '';
+}
+
+</script>
 
 </body>
 </html>

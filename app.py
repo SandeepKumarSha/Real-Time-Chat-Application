@@ -6,18 +6,23 @@ from flask_login import (
     login_required,
     current_user
 )
+from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from models import db, User
+from models import db, User, Message
 
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = 'secret'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 
 db.init_app(app)
 
+socketio = SocketIO(app)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
+
 login_manager.login_view = 'login'
 
 
@@ -37,18 +42,19 @@ def register():
     if request.method == 'POST':
 
         username = request.form['username']
-        password = request.form['password']
+        password = generate_password_hash(
+            request.form['password']
+        )
 
-        existing_user = User.query.filter_by(username=username).first()
+        if User.query.filter_by(
+            username=username
+        ).first():
 
-        if existing_user:
             return "Username already exists!"
-
-        hashed_password = generate_password_hash(password)
 
         user = User(
             username=username,
-            password=hashed_password
+            password=password
         )
 
         db.session.add(user)
@@ -67,13 +73,18 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(
+            username=username
+        ).first()
 
-        if user and check_password_hash(user.password, password):
+        if user and check_password_hash(
+            user.password,
+            password
+        ):
+
             login_user(user)
-            return redirect('/chat')
 
-        return "Invalid username or password!"
+            return redirect('/chat')
 
     return render_template('login.html')
 
@@ -81,17 +92,38 @@ def login():
 @app.route('/chat')
 @login_required
 def chat():
+
+    messages = Message.query.all()
+
     return render_template(
         'chat.html',
-        username=current_user.username
+        username=current_user.username,
+        messages=messages
     )
 
 
 @app.route('/logout')
-@login_required
 def logout():
     logout_user()
     return redirect('/login')
+
+
+@socketio.on('send_message')
+def handle_message(data):
+
+    message = Message(
+        username=data['username'],
+        content=data['message']
+    )
+
+    db.session.add(message)
+    db.session.commit()
+
+    emit(
+        'receive_message',
+        data,
+        broadcast=True
+    )
 
 
 if __name__ == '__main__':
@@ -99,4 +131,7 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
 
-    app.run(debug=True)
+    socketio.run(
+        app,
+        debug=True
+    )
