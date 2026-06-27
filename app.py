@@ -6,11 +6,15 @@ from flask_login import (
     login_required,
     current_user
 )
-from flask_socketio import SocketIO, emit
+from flask_socketio import (
+    SocketIO,
+    emit,
+    join_room
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
-from models import db, User, Message
+from models import db, User, PrivateMessage
 
 app = Flask(__name__)
 
@@ -48,7 +52,9 @@ def register():
             request.form['password']
         )
 
-        if User.query.filter_by(username=username).first():
+        if User.query.filter_by(
+                username=username).first():
+
             return "Username already exists!"
 
         user = User(
@@ -93,7 +99,10 @@ def login():
 @login_required
 def chat():
 
-    messages = Message.query.all()
+    messages = PrivateMessage.query.filter(
+        (PrivateMessage.sender == current_user.username) |
+        (PrivateMessage.receiver == current_user.username)
+    ).all()
 
     return render_template(
         'chat.html',
@@ -112,6 +121,17 @@ def logout():
     logout_user()
 
     return redirect('/login')
+
+
+@socketio.on('join_private_room')
+def join_private_room(data):
+
+    user1 = data['user1']
+    user2 = data['user2']
+
+    room = '_'.join(sorted([user1, user2]))
+
+    join_room(room)
 
 
 @socketio.on('user_connected')
@@ -145,10 +165,14 @@ def disconnected():
 @socketio.on('typing')
 def typing(data):
 
+    room = '_'.join(
+        sorted([data['username'], data['receiver']])
+    )
+
     emit(
         'show_typing',
         data,
-        broadcast=True,
+        room=room,
         include_self=False
     )
 
@@ -156,8 +180,13 @@ def typing(data):
 @socketio.on('send_message')
 def handle_message(data):
 
-    message = Message(
-        username=data['username'],
+    room = '_'.join(
+        sorted([data['username'], data['receiver']])
+    )
+
+    message = PrivateMessage(
+        sender=data['username'],
+        receiver=data['receiver'],
         content=data['message']
     )
 
@@ -171,7 +200,7 @@ def handle_message(data):
             'message': data['message'],
             'timestamp': datetime.now().strftime("%I:%M %p")
         },
-        broadcast=True
+        room=room
     )
 
 

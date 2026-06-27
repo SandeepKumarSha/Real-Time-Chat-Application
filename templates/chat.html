@@ -29,7 +29,13 @@
 
         <div class="header">
 
-            <h2>💬 Real-Time Chat</h2>
+            <div>
+                <h2>💬 Real-Time Chat</h2>
+
+                <small id="current-chat">
+                    Select a user to start chatting
+                </small>
+            </div>
 
             <div>
                 Welcome <b>{{ username }}</b> |
@@ -44,12 +50,12 @@
             {% for msg in messages %}
 
             <div class="message
-                {% if msg.username == username %}
+                {% if msg.sender == username %}
                     own-message
                 {% endif %}
             ">
 
-                <b>{{ msg.username }}</b>
+                <b>{{ msg.sender }}</b>
 
                 <p>{{ msg.content }}</p>
 
@@ -68,9 +74,9 @@
         <div class="input-area">
 
             <input
-                    type="text"
-                    id="message"
-                    placeholder="Type a message...">
+                type="text"
+                id="message"
+                placeholder="Type a message...">
 
             <button onclick="sendMessage()">
                 Send
@@ -88,6 +94,8 @@
 const socket = io();
 
 const username = "{{ username }}";
+
+let selectedUser = null;
 
 socket.emit('user_connected', username);
 
@@ -110,9 +118,43 @@ socket.on('update_users', function(users){
 
     users.forEach(function(user){
 
-        list.innerHTML += `
-            <li>🟢 ${user}</li>
-        `;
+        if(user !== username){
+
+            let li = document.createElement('li');
+
+            li.innerHTML = `🟢 ${user}`;
+
+            li.classList.add('user-item');
+
+            li.onclick = function(){
+
+                document.querySelectorAll(
+                    '.user-item'
+                ).forEach(item => {
+                    item.classList.remove('active-user');
+                });
+
+                li.classList.add('active-user');
+
+                selectedUser = user;
+
+                socket.emit(
+                    'join_private_room',
+                    {
+                        user1: username,
+                        user2: selectedUser
+                    }
+                );
+
+                document.getElementById(
+                    'current-chat'
+                ).innerHTML =
+                    `Chatting with <b>${user}</b>`;
+            };
+
+            list.appendChild(li);
+        }
+
     });
 
 });
@@ -162,6 +204,13 @@ socket.on('receive_message', function(data){
 
 function sendMessage(){
 
+    if(selectedUser === null){
+
+        alert("Please select a user first!");
+
+        return;
+    }
+
     let message =
         document.getElementById('message');
 
@@ -172,21 +221,28 @@ function sendMessage(){
     socket.emit('send_message', {
 
         username: username,
+        receiver: selectedUser,
         message: message.value
 
     });
 
     message.value = '';
-
 }
 
 
 document.getElementById('message')
 .addEventListener('input', function(){
 
-    socket.emit('typing', {
-        username: username
-    });
+    if(selectedUser){
+
+        socket.emit('typing', {
+
+            username: username,
+            receiver: selectedUser
+
+        });
+
+    }
 
 });
 

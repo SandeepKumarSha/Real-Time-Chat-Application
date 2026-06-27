@@ -21,14 +21,19 @@ class User(UserMixin, db.Model):
     )
 
 
-class Message(db.Model):
+class PrivateMessage(db.Model):
 
     id = db.Column(
         db.Integer,
         primary_key=True
     )
 
-    username = db.Column(
+    sender = db.Column(
+        db.String(100),
+        nullable=False
+    )
+
+    receiver = db.Column(
         db.String(100),
         nullable=False
     )

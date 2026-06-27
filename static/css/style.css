@@ -38,8 +38,19 @@ body{
     list-style:none;
 }
 
-.sidebar li{
-    padding:10px 0;
+.user-item{
+    padding:12px;
+    border-radius:8px;
+    cursor:pointer;
+    margin-bottom:5px;
+}
+
+.user-item:hover{
+    background:#333333;
+}
+
+.active-user{
+    background:#4caf50;
 }
 
 .chat-main{
@@ -96,6 +107,14 @@ body{
     opacity:0.8;
 }
 
+#typing-indicator{
+    color:#bbbbbb;
+    font-style:italic;
+    padding-left:20px;
+    padding-bottom:10px;
+    height:20px;
+}
+
 .input-area{
     display:flex;
     padding:15px;
@@ -124,11 +143,4 @@ body{
 
 .input-area button:hover{
     background:#2196f3;
-}
-#typing-indicator{
-    color:#bbbbbb;
-    font-style:italic;
-    padding-left:20px;
-    padding-bottom:10px;
-    height:20px;
 }
