@@ -8,6 +8,7 @@ from flask_login import (
 )
 from flask_socketio import SocketIO, emit
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 from models import db, User, Message
 
@@ -18,12 +19,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 
 db.init_app(app)
 
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='threading')
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-
 login_manager.login_view = 'login'
+
+online_users = []
 
 
 @login_manager.user_loader
@@ -47,8 +49,7 @@ def register():
         )
 
         if User.query.filter_by(
-            username=username
-        ).first():
+                username=username).first():
 
             return "Username already exists!"
 
@@ -78,13 +79,14 @@ def login():
         ).first()
 
         if user and check_password_hash(
-            user.password,
-            password
-        ):
+                user.password,
+                password):
 
             login_user(user)
 
             return redirect('/chat')
+
+        return "Invalid Username or Password"
 
     return render_template('login.html')
 
@@ -103,9 +105,43 @@ def chat():
 
 
 @app.route('/logout')
+@login_required
 def logout():
+
+    if current_user.username in online_users:
+        online_users.remove(current_user.username)
+
     logout_user()
+
     return redirect('/login')
+
+
+@socketio.on('user_connected')
+def user_connected(username):
+
+    if username not in online_users:
+        online_users.append(username)
+
+    emit(
+        'update_users',
+        online_users,
+        broadcast=True
+    )
+
+
+@socketio.on('disconnect')
+def disconnected():
+
+    if current_user.is_authenticated:
+
+        if current_user.username in online_users:
+            online_users.remove(current_user.username)
+
+        emit(
+            'update_users',
+            online_users,
+            broadcast=True
+        )
 
 
 @socketio.on('send_message')
@@ -121,7 +157,11 @@ def handle_message(data):
 
     emit(
         'receive_message',
-        data,
+        {
+            'username': data['username'],
+            'message': data['message'],
+            'timestamp': datetime.now().strftime("%I:%M %p")
+        },
         broadcast=True
     )
 

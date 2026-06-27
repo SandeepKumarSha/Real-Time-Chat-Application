@@ -1,53 +1,86 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+
     <title>Real-Time Chat</title>
 
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/style.css') }}">
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
 </head>
 
 <body>
 
 <div class="chat-container">
 
-    <div class="header">
-        <h2>💬 Real-Time Chat</h2>
+    <div class="sidebar">
 
-        <div>
-            Welcome <b>{{ username }}</b>
-            |
-            <a href="/logout">Logout</a>
-        </div>
+        <h3>🟢 Online Users</h3>
+
+        <ul id="online-users"></ul>
+
     </div>
 
-    <div id="chat-box" class="chat-box">
 
-        {% for msg in messages %}
-            <div class="message">
-                <b>{{ msg.username }}</b>
-                <p>{{ msg.content }}</p>
+    <div class="chat-main">
+
+        <div class="header">
+
+            <h2>💬 Real-Time Chat</h2>
+
+            <div>
+                Welcome <b>{{ username }}</b> |
+                <a href="/logout">Logout</a>
             </div>
-        {% endfor %}
 
-    </div>
+        </div>
 
-    <div class="input-area">
 
-        <input
-            type="text"
-            id="message"
-            placeholder="Type a message...">
+        <div id="chat-box" class="chat-box">
 
-        <button onclick="sendMessage()">
-            Send
-        </button>
+            {% for msg in messages %}
+
+            <div class="message
+                {% if msg.username == username %}
+                    own-message
+                {% endif %}
+            ">
+
+                <b>{{ msg.username }}</b>
+
+                <p>{{ msg.content }}</p>
+
+                <small>
+                    {{ msg.timestamp.strftime("%I:%M %p") }}
+                </small>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+
+        <div class="input-area">
+
+            <input
+                    type="text"
+                    id="message"
+                    placeholder="Type a message...">
+
+            <button onclick="sendMessage()">
+                Send
+            </button>
+
+        </div>
 
     </div>
 
 </div>
+
 
 <script>
 
@@ -55,39 +88,88 @@ const socket = io();
 
 const username = "{{ username }}";
 
+socket.emit('user_connected', username);
+
+
+window.onload = function(){
+
+    let box =
+        document.getElementById('chat-box');
+
+    box.scrollTop = box.scrollHeight;
+};
+
+
+socket.on('update_users', function(users){
+
+    let list =
+        document.getElementById('online-users');
+
+    list.innerHTML = '';
+
+    users.forEach(function(user){
+
+        list.innerHTML += `
+            <li>🟢 ${user}</li>
+        `;
+    });
+
+});
+
+
 socket.on('receive_message', function(data){
 
-    let box = document.getElementById('chat-box');
+    let box =
+        document.getElementById('chat-box');
+
+    let alignment = '';
+
+    if(data.username === username){
+        alignment = 'own-message';
+    }
 
     box.innerHTML += `
-        <div class="message">
+        <div class="message ${alignment}">
             <b>${data.username}</b>
             <p>${data.message}</p>
+            <small>${data.timestamp}</small>
         </div>
     `;
 
     box.scrollTop = box.scrollHeight;
+
 });
+
 
 function sendMessage(){
 
     let message =
-        document.getElementById('message').value;
+        document.getElementById('message');
 
-    if(message.trim() === ''){
+    if(message.value.trim() === ''){
         return;
     }
 
-    socket.emit(
-        'send_message',
-        {
-            username: username,
-            message: message
-        }
-    );
+    socket.emit('send_message', {
 
-    document.getElementById('message').value = '';
+        username: username,
+        message: message.value
+
+    });
+
+    message.value = '';
+
 }
+
+
+document.getElementById('message')
+.addEventListener('keypress', function(e){
+
+    if(e.key === 'Enter'){
+        sendMessage();
+    }
+
+});
 
 </script>
 
