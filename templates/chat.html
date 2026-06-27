@@ -47,26 +47,6 @@
 
         <div id="chat-box" class="chat-box">
 
-            {% for msg in messages %}
-
-            <div class="message
-                {% if msg.sender == username %}
-                    own-message
-                {% endif %}
-            ">
-
-                <b>{{ msg.sender }}</b>
-
-                <p>{{ msg.content }}</p>
-
-                <small>
-                    {{ msg.timestamp.strftime("%I:%M %p") }}
-                </small>
-
-            </div>
-
-            {% endfor %}
-
         </div>
 
         <div id="typing-indicator"></div>
@@ -100,15 +80,6 @@ let selectedUser = null;
 socket.emit('user_connected', username);
 
 
-window.onload = function(){
-
-    let box =
-        document.getElementById('chat-box');
-
-    box.scrollTop = box.scrollHeight;
-};
-
-
 socket.on('update_users', function(users){
 
     let list =
@@ -126,7 +97,7 @@ socket.on('update_users', function(users){
 
             li.classList.add('user-item');
 
-            li.onclick = function(){
+            li.onclick = async function(){
 
                 document.querySelectorAll(
                     '.user-item'
@@ -150,6 +121,9 @@ socket.on('update_users', function(users){
                     'current-chat'
                 ).innerHTML =
                     `Chatting with <b>${user}</b>`;
+
+
+                loadMessages();
             };
 
             list.appendChild(li);
@@ -158,6 +132,39 @@ socket.on('update_users', function(users){
     });
 
 });
+
+
+async function loadMessages(){
+
+    const response =
+        await fetch(`/get_messages/${selectedUser}`);
+
+    const messages = await response.json();
+
+    let box =
+        document.getElementById('chat-box');
+
+    box.innerHTML = '';
+
+    messages.forEach(function(msg){
+
+        let alignment = '';
+
+        if(msg.sender === username){
+            alignment = 'own-message';
+        }
+
+        box.innerHTML += `
+            <div class="message ${alignment}">
+                <b>${msg.sender}</b>
+                <p>${msg.content}</p>
+                <small>${msg.timestamp}</small>
+            </div>
+        `;
+    });
+
+    box.scrollTop = box.scrollHeight;
+}
 
 
 socket.on('show_typing', function(data){
@@ -179,6 +186,13 @@ socket.on('show_typing', function(data){
 
 
 socket.on('receive_message', function(data){
+
+    if(
+        data.username !== selectedUser &&
+        data.username !== username
+    ){
+        return;
+    }
 
     let box =
         document.getElementById('chat-box');

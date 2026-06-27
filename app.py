@@ -11,7 +11,10 @@ from flask_socketio import (
     emit,
     join_room
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
 from datetime import datetime
 
 from models import db, User, PrivateMessage
@@ -32,10 +35,14 @@ login_manager.login_view = 'login'
 online_users = []
 
 
+# ---------------- LOGIN MANAGER ---------------- #
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+
+# ---------------- ROUTES ---------------- #
 
 @app.route('/')
 def home():
@@ -52,9 +59,11 @@ def register():
             request.form['password']
         )
 
-        if User.query.filter_by(
-                username=username).first():
+        existing_user = User.query.filter_by(
+            username=username
+        ).first()
 
+        if existing_user:
             return "Username already exists!"
 
         user = User(
@@ -99,15 +108,9 @@ def login():
 @login_required
 def chat():
 
-    messages = PrivateMessage.query.filter(
-        (PrivateMessage.sender == current_user.username) |
-        (PrivateMessage.receiver == current_user.username)
-    ).all()
-
     return render_template(
         'chat.html',
-        username=current_user.username,
-        messages=messages
+        username=current_user.username
     )
 
 
@@ -123,16 +126,40 @@ def logout():
     return redirect('/login')
 
 
-@socketio.on('join_private_room')
-def join_private_room(data):
+# -------- LOAD PRIVATE CHAT HISTORY -------- #
 
-    user1 = data['user1']
-    user2 = data['user2']
+@app.route('/get_messages/<receiver>')
+@login_required
+def get_messages(receiver):
 
-    room = '_'.join(sorted([user1, user2]))
+    messages = PrivateMessage.query.filter(
+        (
+            (PrivateMessage.sender == current_user.username) &
+            (PrivateMessage.receiver == receiver)
+        )
+        |
+        (
+            (PrivateMessage.sender == receiver) &
+            (PrivateMessage.receiver == current_user.username)
+        )
+    ).order_by(
+        PrivateMessage.timestamp
+    ).all()
 
-    join_room(room)
+    data = []
 
+    for msg in messages:
+
+        data.append({
+            'sender': msg.sender,
+            'content': msg.content,
+            'timestamp': msg.timestamp.strftime("%I:%M %p")
+        })
+
+    return data
+
+
+# ---------------- SOCKET EVENTS ---------------- #
 
 @socketio.on('user_connected')
 def user_connected(username):
@@ -162,11 +189,31 @@ def disconnected():
         )
 
 
+# -------- JOIN PRIVATE ROOM -------- #
+
+@socketio.on('join_private_room')
+def join_private_room(data):
+
+    user1 = data['user1']
+    user2 = data['user2']
+
+    room = '_'.join(
+        sorted([user1, user2])
+    )
+
+    join_room(room)
+
+
+# -------- TYPING INDICATOR -------- #
+
 @socketio.on('typing')
 def typing(data):
 
     room = '_'.join(
-        sorted([data['username'], data['receiver']])
+        sorted([
+            data['username'],
+            data['receiver']
+        ])
     )
 
     emit(
@@ -177,17 +224,23 @@ def typing(data):
     )
 
 
+# -------- SEND PRIVATE MESSAGE -------- #
+
 @socketio.on('send_message')
 def handle_message(data):
 
+    sender = data['username']
+    receiver = data['receiver']
+    message_text = data['message']
+
     room = '_'.join(
-        sorted([data['username'], data['receiver']])
+        sorted([sender, receiver])
     )
 
     message = PrivateMessage(
-        sender=data['username'],
-        receiver=data['receiver'],
-        content=data['message']
+        sender=sender,
+        receiver=receiver,
+        content=message_text
     )
 
     db.session.add(message)
@@ -196,13 +249,15 @@ def handle_message(data):
     emit(
         'receive_message',
         {
-            'username': data['username'],
-            'message': data['message'],
+            'username': sender,
+            'message': message_text,
             'timestamp': datetime.now().strftime("%I:%M %p")
         },
         room=room
     )
 
+
+# ---------------- MAIN ---------------- #
 
 if __name__ == '__main__':
 
