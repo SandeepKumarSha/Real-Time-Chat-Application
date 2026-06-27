@@ -48,9 +48,7 @@ def register():
             request.form['password']
         )
 
-        if User.query.filter_by(
-                username=username).first():
-
+        if User.query.filter_by(username=username).first():
             return "Username already exists!"
 
         user = User(
@@ -142,6 +140,17 @@ def disconnected():
             online_users,
             broadcast=True
         )
+
+
+@socketio.on('typing')
+def typing(data):
+
+    emit(
+        'show_typing',
+        data,
+        broadcast=True,
+        include_self=False
+    )
 
 
 @socketio.on('send_message')

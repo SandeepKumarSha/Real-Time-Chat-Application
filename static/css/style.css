@@ -125,3 +125,10 @@ body{
 .input-area button:hover{
     background:#2196f3;
 }
+#typing-indicator{
+    color:#bbbbbb;
+    font-style:italic;
+    padding-left:20px;
+    padding-bottom:10px;
+    height:20px;
+}

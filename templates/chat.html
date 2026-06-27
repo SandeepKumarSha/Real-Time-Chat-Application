@@ -63,6 +63,7 @@
 
         </div>
 
+        <div id="typing-indicator"></div>
 
         <div class="input-area">
 
@@ -117,6 +118,24 @@ socket.on('update_users', function(users){
 });
 
 
+socket.on('show_typing', function(data){
+
+    document.getElementById(
+        'typing-indicator'
+    ).innerHTML =
+        `${data.username} is typing...`;
+
+    setTimeout(function(){
+
+        document.getElementById(
+            'typing-indicator'
+        ).innerHTML = '';
+
+    }, 1000);
+
+});
+
+
 socket.on('receive_message', function(data){
 
     let box =
@@ -160,6 +179,16 @@ function sendMessage(){
     message.value = '';
 
 }
+
+
+document.getElementById('message')
+.addEventListener('input', function(){
+
+    socket.emit('typing', {
+        username: username
+    });
+
+});
 
 
 document.getElementById('message')
