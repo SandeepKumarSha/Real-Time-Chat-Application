@@ -345,6 +345,7 @@ body {
 /* Chat Main Area */
 .chat-main {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     background: var(--chat-bg);
@@ -393,6 +394,7 @@ body {
     flex: 1;
     padding: 24px;
     overflow-y: auto;
+    overflow-x: hidden;
     background: var(--chat-bg);
     display: flex;
     flex-direction: column;
@@ -427,6 +429,7 @@ body {
     display: flex;
     flex-direction: column;
     max-width: 70%;
+    min-width: 0;
     animation: fadeInUp 0.25s ease-out;
 }
 
@@ -458,9 +461,11 @@ body {
     font-size: 14px;
     line-height: 1.5;
     word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     white-space: pre-wrap;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-width: 100%;
 }
 
 .message-wrapper.own .message-bubble {
@@ -609,4 +614,123 @@ body {
     .chat-container.chat-active .chat-main {
         display: flex;
     }
+}
+
+/* ---------------- UNREAD BADGES ---------------- */
+.unread-badge {
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-right: 8px;
+    min-width: 18px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
+    animation: bounceIn 0.3s ease;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------------- GROUP SHORTCUT BUTTON ---------------- */
+.group-shortcut-btn {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #818cf8;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.group-shortcut-btn:hover {
+    background: var(--accent-gradient);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transform: translateY(-1px);
+}
+
+.group-shortcut-btn:active {
+    transform: translateY(0);
+}
+
+/* ---------------- CHAT HEADER BADGES ---------------- */
+.chat-header-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+}
+
+.chat-header-badge.group-badge {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.chat-header-badge.dm-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+/* ---------------- THEMED ACTIVE STATES ---------------- */
+#channel-group.active {
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.12);
+    border-left: 3px solid #6366f1;
+    border-radius: 0 10px 10px 0;
+}
+
+#online-users .sidebar-item.active {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.12);
+    border-left: 3px solid #10b981;
+    border-radius: 0 10px 10px 0;
+}
+
+/* ---------------- THEMED MESSAGE BUBBLES ---------------- */
+.message-wrapper.own.group-msg .message-bubble {
+    background: var(--accent-gradient);
+}
+
+.message-wrapper.own.dm-msg .message-bubble {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+/* ---------------- THEMED INPUT & SEND BUTTON ---------------- */
+/* Group Mode */
+.chat-main.group-mode .message-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.chat-main.group-mode .send-btn {
+    background: var(--accent-gradient);
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+}
+
+/* DM Mode */
+.chat-main.dm-mode .message-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.chat-main.dm-mode .send-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
 }

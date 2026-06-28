@@ -176,6 +176,7 @@ def get_messages(receiver):
 def user_connected(username):
 
     join_room('group_chat')
+    join_room(f"user_{username}")
 
     if username not in online_users:
         online_users.append(username)
@@ -251,34 +252,42 @@ def handle_message(data):
     message_text = data['message']
 
     if receiver == 'group':
-        room = 'group_chat'
         message = GroupMessage(
             sender=sender,
             content=message_text
         )
-    else:
-        room = '_'.join(
-            sorted([sender, receiver])
+        db.session.add(message)
+        db.session.commit()
+
+        emit(
+            'receive_message',
+            {
+                'username': sender,
+                'message': message_text,
+                'timestamp': datetime.now().strftime("%I:%M %p"),
+                'receiver': receiver
+            },
+            room='group_chat'
         )
+    else:
         message = PrivateMessage(
             sender=sender,
             receiver=receiver,
             content=message_text
         )
+        db.session.add(message)
+        db.session.commit()
 
-    db.session.add(message)
-    db.session.commit()
-
-    emit(
-        'receive_message',
-        {
+        emit_data = {
             'username': sender,
             'message': message_text,
             'timestamp': datetime.now().strftime("%I:%M %p"),
             'receiver': receiver
-        },
-        room=room
-    )
+        }
+        # Emit to receiver's personal room
+        emit('receive_message', emit_data, room=f"user_{receiver}")
+        # Emit to sender's personal room
+        emit('receive_message', emit_data, room=f"user_{sender}")
 
 
 # ---------------- MAIN ---------------- #

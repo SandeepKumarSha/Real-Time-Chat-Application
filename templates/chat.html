@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Chat | ChatApp</title>
+    <title>Real-Time Chat | Hello</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.0.3">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
@@ -14,7 +14,7 @@
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <div class="app-brand">💬 ChatApp</div>
+            <div class="app-brand">💬 Hello</div>
         </div>
 
         <div class="sidebar-content">
@@ -25,6 +25,7 @@
                     <li id="channel-group" class="sidebar-item active" onclick="selectChat('group')">
                         <span class="avatar" style="background: var(--accent-gradient);">🌐</span>
                         <span style="flex: 1;">Group Chat</span>
+                        <span id="badge-group" class="unread-badge" style="display: none;">0</span>
                         <span class="sidebar-item-status online"></span>
                     </li>
                 </ul>
@@ -61,11 +62,18 @@
                 <button class="back-btn" onclick="showSidebar()" title="Back to chats">
                     ←
                 </button>
-                <div class="chat-header-info">
-                    <div id="chat-header-title" class="chat-header-title">🌐 Group Chat</div>
-                    <div id="chat-header-subtitle" class="chat-header-subtitle">Public channel for everyone</div>
+                <div class="chat-header-info" style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <div id="chat-header-title" class="chat-header-title">🌐 Group Chat</div>
+                        <div id="chat-header-subtitle" class="chat-header-subtitle">Public channel for everyone</div>
+                    </div>
+                    <span id="chat-header-badge" class="chat-header-badge group-badge">Public</span>
                 </div>
             </div>
+            <!-- Shortcut to Group Chat -->
+            <button id="group-shortcut-btn" class="group-shortcut-btn" onclick="selectChat('group')" style="display: none;">
+                🌐 Go to Group Chat
+            </button>
         </div>
 
         <div id="chat-box" class="chat-box">
@@ -126,6 +134,8 @@ async function loadMessages() {
     let box = document.getElementById('chat-box');
     box.innerHTML = '';
 
+    const chatType = (selectedUser === 'group') ? 'group-msg' : 'dm-msg';
+
     if (messages.length === 0) {
         box.innerHTML = `
             <div class="chat-empty-state">
@@ -138,7 +148,7 @@ async function loadMessages() {
         messages.forEach(function(msg) {
             let alignment = (msg.sender === username) ? 'own' : 'other';
             box.innerHTML += `
-                <div class="message-wrapper ${alignment}">
+                <div class="message-wrapper ${alignment} ${chatType}">
                     <div class="message-meta">${msg.sender}</div>
                     <div class="message-bubble">${msg.content}</div>
                     <div class="message-time">${msg.timestamp}</div>
@@ -157,16 +167,44 @@ function selectChat(target) {
         item.classList.remove('active');
     });
     
+    const chatMain = document.querySelector('.chat-main');
+    const headerBadge = document.getElementById('chat-header-badge');
+    const shortcutBtn = document.getElementById('group-shortcut-btn');
+
     if (target === 'group') {
         const groupItem = document.getElementById('channel-group');
         if (groupItem) groupItem.classList.add('active');
         document.getElementById('chat-header-title').innerText = '🌐 Group Chat';
         document.getElementById('chat-header-subtitle').innerText = 'Public channel for everyone';
+        
+        if (chatMain) {
+            chatMain.classList.remove('dm-mode');
+            chatMain.classList.add('group-mode');
+        }
+        if (headerBadge) {
+            headerBadge.innerText = 'Public';
+            headerBadge.className = 'chat-header-badge group-badge';
+        }
+        if (shortcutBtn) {
+            shortcutBtn.style.display = 'none';
+        }
     } else {
         const userItem = document.getElementById(`user-${target}`);
         if (userItem) userItem.classList.add('active');
         document.getElementById('chat-header-title').innerText = `👤 Chatting with ${target}`;
         document.getElementById('chat-header-subtitle').innerText = 'End-to-end direct message';
+        
+        if (chatMain) {
+            chatMain.classList.remove('group-mode');
+            chatMain.classList.add('dm-mode');
+        }
+        if (headerBadge) {
+            headerBadge.innerText = 'Direct Message';
+            headerBadge.className = 'chat-header-badge dm-badge';
+        }
+        if (shortcutBtn) {
+            shortcutBtn.style.display = 'flex';
+        }
         
         socket.emit('join_private_room', {
             user1: username,
@@ -174,6 +212,13 @@ function selectChat(target) {
         });
     }
     
+    // Clear unread badge
+    const badge = document.getElementById(`badge-${target}`);
+    if (badge) {
+        badge.innerText = '0';
+        badge.style.display = 'none';
+    }
+
     // Switch views on mobile
     const container = document.querySelector('.chat-container');
     container.classList.add('chat-active');
@@ -207,6 +252,7 @@ socket.on('update_users', function(users) {
             li.innerHTML = `
                 <div class="avatar" style="background: ${color};">${initials}</div>
                 <span style="flex: 1;">${user}</span>
+                <span id="badge-${user}" class="unread-badge" style="display: none;">0</span>
                 <span class="sidebar-item-status online"></span>
             `;
 
@@ -229,6 +275,15 @@ socket.on('receive_message', function(data) {
         ));
 
     if (!isCurrentRoom) {
+        // Increment unread badge count
+        const target = (data.receiver === 'group') ? 'group' : data.username;
+        const badge = document.getElementById(`badge-${target}`);
+        if (badge) {
+            let count = parseInt(badge.innerText) || 0;
+            count++;
+            badge.innerText = count;
+            badge.style.display = 'inline-block';
+        }
         return;
     }
 
@@ -241,9 +296,10 @@ socket.on('receive_message', function(data) {
     }
 
     let alignment = (data.username === username) ? 'own' : 'other';
+    let chatType = (data.receiver === 'group') ? 'group-msg' : 'dm-msg';
 
     box.innerHTML += `
-        <div class="message-wrapper ${alignment}">
+        <div class="message-wrapper ${alignment} ${chatType}">
             <div class="message-meta">${data.username}</div>
             <div class="message-bubble">${data.message}</div>
             <div class="message-time">${data.timestamp}</div>
