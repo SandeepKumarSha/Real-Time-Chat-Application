@@ -1,275 +1,320 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-
-    <title>Real-Time Chat</title>
-
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/style.css') }}">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Chat | ChatApp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
 </head>
-
 <body>
 
 <div class="chat-container">
-
+    <!-- Sidebar -->
     <div class="sidebar">
-
-        <h3>🟢 Online Users</h3>
-
-        <ul id="online-users"></ul>
-
-    </div>
-
-
-    <div class="chat-main">
-
-        <div class="header">
-
-            <div>
-                <h2>💬 Real-Time Chat</h2>
-
-                <small id="current-chat">
-                    Select a user to start chatting
-                </small>
-            </div>
-
-            <div>
-                Welcome <b>{{ username }}</b> |
-                <a href="/logout">Logout</a>
-            </div>
-
+        <div class="sidebar-header">
+            <div class="app-brand">💬 ChatApp</div>
         </div>
 
+        <div class="sidebar-content">
+            <!-- Channels / Rooms Section -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Channels</div>
+                <ul class="sidebar-list">
+                    <li id="channel-group" class="sidebar-item active" onclick="selectChat('group')">
+                        <span class="avatar" style="background: var(--accent-gradient);">🌐</span>
+                        <span style="flex: 1;">Group Chat</span>
+                        <span class="sidebar-item-status online"></span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Direct Messages / Users Section -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Direct Messages</div>
+                <ul id="online-users" class="sidebar-list">
+                    <!-- Dynamically populated online users -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Current User Profile Panel at the Bottom -->
+        <div class="current-user-panel">
+            <div class="user-profile-info">
+                <div id="current-user-avatar" class="avatar"></div>
+                <div class="user-profile-details">
+                    <span class="user-profile-name">{{ username }}</span>
+                    <span class="user-profile-status"><span class="sidebar-item-status online"></span>Online</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn" title="Logout">
+                Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-main">
+        <div class="chat-header">
+            <div style="display: flex; align-items: center;">
+                <button class="back-btn" onclick="showSidebar()" title="Back to chats">
+                    ←
+                </button>
+                <div class="chat-header-info">
+                    <div id="chat-header-title" class="chat-header-title">🌐 Group Chat</div>
+                    <div id="chat-header-subtitle" class="chat-header-subtitle">Public channel for everyone</div>
+                </div>
+            </div>
+        </div>
 
         <div id="chat-box" class="chat-box">
-
+            <!-- Messages will load dynamically -->
         </div>
 
         <div id="typing-indicator"></div>
 
         <div class="input-area">
-
-            <input
-                type="text"
-                id="message"
-                placeholder="Type a message...">
-
-            <button onclick="sendMessage()">
+            <div class="message-input-wrapper">
+                <input
+                    type="text"
+                    id="message"
+                    class="message-input"
+                    placeholder="Type a message..."
+                    autocomplete="off"
+                >
+            </div>
+            <button class="send-btn" onclick="sendMessage()">
                 Send
             </button>
-
         </div>
-
     </div>
-
 </div>
 
-
 <script>
-
 const socket = io();
-
 const username = "{{ username }}";
+let selectedUser = 'group';
+let typingTimeout = null;
 
-let selectedUser = null;
+// Dynamic avatar color selection helper
+function getAvatarColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = [
+        '#4f46e5', '#db2777', '#7c3aed', '#059669', 
+        '#d97706', '#2563eb', '#dc2626', '#0d9488'
+    ];
+    return colors[Math.abs(hash) % colors.length];
+}
 
+// Render dynamic avatar for current user
+const myAvatar = document.getElementById('current-user-avatar');
+myAvatar.innerText = username.charAt(0).toUpperCase();
+myAvatar.style.background = getAvatarColor(username);
+
+// Establish connection
 socket.emit('user_connected', username);
 
+// Load messages function
+async function loadMessages() {
+    const response = await fetch(`/get_messages/${selectedUser}`);
+    const messages = await response.json();
+    
+    let box = document.getElementById('chat-box');
+    box.innerHTML = '';
 
-socket.on('update_users', function(users){
+    if (messages.length === 0) {
+        box.innerHTML = `
+            <div class="chat-empty-state">
+                <div class="chat-empty-icon">💬</div>
+                <div class="chat-empty-title">No messages yet</div>
+                <p>Be the first to say hi!</p>
+            </div>
+        `;
+    } else {
+        messages.forEach(function(msg) {
+            let alignment = (msg.sender === username) ? 'own' : 'other';
+            box.innerHTML += `
+                <div class="message-wrapper ${alignment}">
+                    <div class="message-meta">${msg.sender}</div>
+                    <div class="message-bubble">${msg.content}</div>
+                    <div class="message-time">${msg.timestamp}</div>
+                </div>
+            `;
+        });
+    }
+    box.scrollTop = box.scrollHeight;
+}
 
-    let list =
-        document.getElementById('online-users');
+// Select chat channel or DM
+function selectChat(target) {
+    selectedUser = target;
+    
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    if (target === 'group') {
+        const groupItem = document.getElementById('channel-group');
+        if (groupItem) groupItem.classList.add('active');
+        document.getElementById('chat-header-title').innerText = '🌐 Group Chat';
+        document.getElementById('chat-header-subtitle').innerText = 'Public channel for everyone';
+    } else {
+        const userItem = document.getElementById(`user-${target}`);
+        if (userItem) userItem.classList.add('active');
+        document.getElementById('chat-header-title').innerText = `👤 Chatting with ${target}`;
+        document.getElementById('chat-header-subtitle').innerText = 'End-to-end direct message';
+        
+        socket.emit('join_private_room', {
+            user1: username,
+            user2: selectedUser
+        });
+    }
+    
+    // Switch views on mobile
+    const container = document.querySelector('.chat-container');
+    container.classList.add('chat-active');
+    
+    loadMessages();
+}
 
+// Mobile sidebar view toggle back
+function showSidebar() {
+    const container = document.querySelector('.chat-container');
+    container.classList.remove('chat-active');
+}
+
+// Render dynamic online users list
+socket.on('update_users', function(users) {
+    let list = document.getElementById('online-users');
     list.innerHTML = '';
 
-    users.forEach(function(user){
-
-        if(user !== username){
-
+    users.forEach(function(user) {
+        if (user !== username) {
             let li = document.createElement('li');
+            li.id = `user-${user}`;
+            li.classList.add('sidebar-item');
+            if (selectedUser === user) {
+                li.classList.add('active');
+            }
 
-            li.innerHTML = `🟢 ${user}`;
+            const color = getAvatarColor(user);
+            const initials = user.charAt(0).toUpperCase();
 
-            li.classList.add('user-item');
+            li.innerHTML = `
+                <div class="avatar" style="background: ${color};">${initials}</div>
+                <span style="flex: 1;">${user}</span>
+                <span class="sidebar-item-status online"></span>
+            `;
 
-            li.onclick = async function(){
-
-                document.querySelectorAll(
-                    '.user-item'
-                ).forEach(item => {
-                    item.classList.remove('active-user');
-                });
-
-                li.classList.add('active-user');
-
-                selectedUser = user;
-
-                socket.emit(
-                    'join_private_room',
-                    {
-                        user1: username,
-                        user2: selectedUser
-                    }
-                );
-
-                document.getElementById(
-                    'current-chat'
-                ).innerHTML =
-                    `Chatting with <b>${user}</b>`;
-
-
-                loadMessages();
+            li.onclick = function() {
+                selectChat(user);
             };
 
             list.appendChild(li);
         }
-
     });
-
 });
 
+// Receive message event
+socket.on('receive_message', function(data) {
+    const isCurrentRoom = 
+        (selectedUser === 'group' && data.receiver === 'group') ||
+        (selectedUser !== 'group' && (
+            (data.username === selectedUser && data.receiver === username) ||
+            (data.username === username && data.receiver === selectedUser)
+        ));
 
-async function loadMessages(){
-
-    const response =
-        await fetch(`/get_messages/${selectedUser}`);
-
-    const messages = await response.json();
-
-    let box =
-        document.getElementById('chat-box');
-
-    box.innerHTML = '';
-
-    messages.forEach(function(msg){
-
-        let alignment = '';
-
-        if(msg.sender === username){
-            alignment = 'own-message';
-        }
-
-        box.innerHTML += `
-            <div class="message ${alignment}">
-                <b>${msg.sender}</b>
-                <p>${msg.content}</p>
-                <small>${msg.timestamp}</small>
-            </div>
-        `;
-    });
-
-    box.scrollTop = box.scrollHeight;
-}
-
-
-socket.on('show_typing', function(data){
-
-    document.getElementById(
-        'typing-indicator'
-    ).innerHTML =
-        `${data.username} is typing...`;
-
-    setTimeout(function(){
-
-        document.getElementById(
-            'typing-indicator'
-        ).innerHTML = '';
-
-    }, 1000);
-
-});
-
-
-socket.on('receive_message', function(data){
-
-    if(
-        data.username !== selectedUser &&
-        data.username !== username
-    ){
+    if (!isCurrentRoom) {
         return;
     }
 
-    let box =
-        document.getElementById('chat-box');
-
-    let alignment = '';
-
-    if(data.username === username){
-        alignment = 'own-message';
+    let box = document.getElementById('chat-box');
+    
+    // Clear empty state if present
+    const emptyState = box.querySelector('.chat-empty-state');
+    if (emptyState) {
+        box.innerHTML = '';
     }
 
+    let alignment = (data.username === username) ? 'own' : 'other';
+
     box.innerHTML += `
-        <div class="message ${alignment}">
-            <b>${data.username}</b>
-            <p>${data.message}</p>
-            <small>${data.timestamp}</small>
+        <div class="message-wrapper ${alignment}">
+            <div class="message-meta">${data.username}</div>
+            <div class="message-bubble">${data.message}</div>
+            <div class="message-time">${data.timestamp}</div>
         </div>
     `;
 
     box.scrollTop = box.scrollHeight;
-
 });
 
+// Typing indicator socket receiver
+socket.on('show_typing', function(data) {
+    const isTypingInCurrentRoom = 
+        (selectedUser === 'group' && data.receiver === 'group') ||
+        (selectedUser !== 'group' && data.receiver === username && data.username === selectedUser);
 
-function sendMessage(){
-
-    if(selectedUser === null){
-
-        alert("Please select a user first!");
-
+    if (!isTypingInCurrentRoom) {
         return;
     }
 
-    let message =
-        document.getElementById('message');
+    document.getElementById('typing-indicator').innerText = `${data.username} is typing...`;
 
-    if(message.value.trim() === ''){
+    if (typingTimeout) {
+        clearTimeout(typingTimeout);
+    }
+
+    typingTimeout = setTimeout(function() {
+        document.getElementById('typing-indicator').innerText = '';
+    }, 1000);
+});
+
+// Send message logic
+function sendMessage() {
+    let messageInput = document.getElementById('message');
+    let content = messageInput.value.trim();
+
+    if (content === '') {
         return;
     }
 
     socket.emit('send_message', {
-
         username: username,
         receiver: selectedUser,
-        message: message.value
-
+        message: content
     });
 
-    message.value = '';
+    messageInput.value = '';
 }
 
-
-document.getElementById('message')
-.addEventListener('input', function(){
-
-    if(selectedUser){
-
-        socket.emit('typing', {
-
-            username: username,
-            receiver: selectedUser
-
-        });
-
-    }
-
+// Typing listener
+document.getElementById('message').addEventListener('input', function() {
+    socket.emit('typing', {
+        username: username,
+        receiver: selectedUser
+    });
 });
 
-
-document.getElementById('message')
-.addEventListener('keypress', function(e){
-
-    if(e.key === 'Enter'){
+// Enter key submit
+document.getElementById('message').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
         sendMessage();
     }
-
 });
 
+// Initialize by opening the group chat
+document.addEventListener('DOMContentLoaded', () => {
+    // Initial state: select Group Chat, show sidebar on mobile (remove active class initially)
+    if (window.innerWidth <= 768) {
+        showSidebar();
+    }
+    selectChat('group');
+});
 </script>
 
 </body>

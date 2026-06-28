@@ -1,39 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | ChatApp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-<h2>Login</h2>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">💬 ChatApp</div>
+        <p class="auth-subtitle">Welcome back! Please enter your details.</p>
 
-<form method="POST">
+        {% if error %}
+        <div class="error-banner">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
 
-    <input
-        type="text"
-        name="username"
-        placeholder="Username"
-        required>
+        <form method="POST">
+            <div class="auth-form-group">
+                <label for="username">Username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    class="auth-input"
+                    placeholder="Enter your username"
+                    required
+                    autocomplete="username"
+                >
+            </div>
 
-    <br><br>
+            <div class="auth-form-group">
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="auth-input"
+                    placeholder="••••••••"
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
 
-    <input
-        type="password"
-        name="password"
-        placeholder="Password"
-        required>
+            <button type="submit" class="auth-btn">
+                Sign In
+            </button>
+        </form>
 
-    <br><br>
-
-    <button type="submit">
-        Login
-    </button>
-
-</form>
-
-<a href="/register">
-Register Here
-</a>
+        <div class="auth-footer">
+            Don't have an account? <a href="/register">Create one</a>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

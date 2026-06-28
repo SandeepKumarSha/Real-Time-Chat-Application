@@ -17,7 +17,7 @@ from werkzeug.security import (
 )
 from datetime import datetime
 
-from models import db, User, PrivateMessage
+from models import db, User, PrivateMessage, GroupMessage
 
 app = Flask(__name__)
 
@@ -64,7 +64,10 @@ def register():
         ).first()
 
         if existing_user:
-            return "Username already exists!"
+            return render_template(
+                'register.html',
+                error="Username already exists!"
+            )
 
         user = User(
             username=username,
@@ -99,7 +102,10 @@ def login():
 
             return redirect('/chat')
 
-        return "Invalid Username or Password"
+        return render_template(
+            'login.html',
+            error="Invalid Username or Password"
+        )
 
     return render_template('login.html')
 
@@ -132,19 +138,24 @@ def logout():
 @login_required
 def get_messages(receiver):
 
-    messages = PrivateMessage.query.filter(
-        (
-            (PrivateMessage.sender == current_user.username) &
-            (PrivateMessage.receiver == receiver)
-        )
-        |
-        (
-            (PrivateMessage.sender == receiver) &
-            (PrivateMessage.receiver == current_user.username)
-        )
-    ).order_by(
-        PrivateMessage.timestamp
-    ).all()
+    if receiver == 'group':
+        messages = GroupMessage.query.order_by(
+            GroupMessage.timestamp
+        ).all()
+    else:
+        messages = PrivateMessage.query.filter(
+            (
+                (PrivateMessage.sender == current_user.username) &
+                (PrivateMessage.receiver == receiver)
+            )
+            |
+            (
+                (PrivateMessage.sender == receiver) &
+                (PrivateMessage.receiver == current_user.username)
+            )
+        ).order_by(
+            PrivateMessage.timestamp
+        ).all()
 
     data = []
 
@@ -163,6 +174,8 @@ def get_messages(receiver):
 
 @socketio.on('user_connected')
 def user_connected(username):
+
+    join_room('group_chat')
 
     if username not in online_users:
         online_users.append(username)
@@ -209,12 +222,16 @@ def join_private_room(data):
 @socketio.on('typing')
 def typing(data):
 
-    room = '_'.join(
-        sorted([
-            data['username'],
-            data['receiver']
-        ])
-    )
+    receiver = data['receiver']
+    if receiver == 'group':
+        room = 'group_chat'
+    else:
+        room = '_'.join(
+            sorted([
+                data['username'],
+                receiver
+            ])
+        )
 
     emit(
         'show_typing',
@@ -233,15 +250,21 @@ def handle_message(data):
     receiver = data['receiver']
     message_text = data['message']
 
-    room = '_'.join(
-        sorted([sender, receiver])
-    )
-
-    message = PrivateMessage(
-        sender=sender,
-        receiver=receiver,
-        content=message_text
-    )
+    if receiver == 'group':
+        room = 'group_chat'
+        message = GroupMessage(
+            sender=sender,
+            content=message_text
+        )
+    else:
+        room = '_'.join(
+            sorted([sender, receiver])
+        )
+        message = PrivateMessage(
+            sender=sender,
+            receiver=receiver,
+            content=message_text
+        )
 
     db.session.add(message)
     db.session.commit()
@@ -251,7 +274,8 @@ def handle_message(data):
         {
             'username': sender,
             'message': message_text,
-            'timestamp': datetime.now().strftime("%I:%M %p")
+            'timestamp': datetime.now().strftime("%I:%M %p"),
+            'receiver': receiver
         },
         room=room
     )
@@ -266,5 +290,6 @@ if __name__ == '__main__':
 
     socketio.run(
         app,
-        debug=True
+        debug=True,
+        allow_unsafe_werkzeug=True
     )
